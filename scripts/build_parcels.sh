@@ -8,7 +8,7 @@
 #   data/out/parcels.pmtiles     vector tiles: layers "parcels" (z14-16) + "labels" (z15-16)
 #   data/out/search/*.json       sharded search index (+ manifest.json manifest)
 #   data/out/SOURCES.txt         where the data came from, and its dates
-# and copies them into app/public/data/ for local dev.
+# and copies them into app/public/data/ (tiles split into chunks) for dev and deploy.
 #
 # Requires: curl, unzip, python3, GDAL >= 3.6 (ogr2ogr, with SpatiaLite), tippecanoe >= 2.17.
 # Set FORCE_DOWNLOAD=1 to re-download source files that already exist.
@@ -82,7 +82,9 @@ python3 -I "$SCRIPTS/build_search_index.py" "$OUT/search" "$OUT/search_meta.json
 
 log "copying into app/public/data for local dev"
 mkdir -p "$ROOT/app/public/data"
-cp "$OUT/parcels.pmtiles" "$ROOT/app/public/data/parcels.pmtiles"
+rm -f "$ROOT/app/public/data/parcels.pmtiles"
+# Split into 8 MiB chunks: static hosts (Cloudflare Pages) cap files at 25 MiB.
+python3 -I "$SCRIPTS/split_pmtiles.py" "$OUT/parcels.pmtiles" "$ROOT/app/public/data/parcels" 8
 rm -rf "$ROOT/app/public/data/search" && cp -r "$OUT/search" "$ROOT/app/public/data/search"
 
 ls -lh "$OUT/parcels.pmtiles" >&2

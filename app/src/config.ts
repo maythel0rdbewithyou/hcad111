@@ -1,10 +1,12 @@
-// Where the generated data lives. In dev these are served from app/public/data
-// (the build script copies them there). In production, point VITE_PMTILES_URL
-// at the R2 public URL of parcels.pmtiles.
+// Where the generated data lives: app/public/data (scripts/build_parcels.sh
+// copies it there), deployed with the app.
 const base = import.meta.env.BASE_URL;
 
-export const PMTILES_URL: string =
-  import.meta.env.VITE_PMTILES_URL ?? `${base}data/parcels.pmtiles`;
+// Parcel tiles: by default the chunked archive in data/parcels/ (see
+// chunkedSource.ts). Set VITE_PMTILES_URL to use a single hosted .pmtiles file
+// instead (e.g. on R2 or any host that supports Range requests and CORS).
+export const PMTILES_URL: string | undefined = import.meta.env.VITE_PMTILES_URL || undefined;
+export const PMTILES_CHUNKS_URL = new URL(`${base}data/parcels`, window.location.href).href;
 
 export const SEARCH_BASE_URL: string =
   import.meta.env.VITE_SEARCH_BASE_URL ?? `${base}data/search`;

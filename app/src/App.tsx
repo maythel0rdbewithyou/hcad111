@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import { Protocol } from 'pmtiles';
+import { PMTiles, Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 // Emit MapLibre's (self-contained) worker as an asset and point MapLibre at it;
 // its default lookup relative to its own module breaks once bundled.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { baseStyle } from './mapStyle';
-import { INITIAL_VIEW } from './config';
+import { INITIAL_VIEW, PMTILES_CHUNKS_URL, PMTILES_URL } from './config';
+import { ChunkedSource } from './chunkedSource';
 import { addParcelLayers, FILL_LAYER, PARCEL_SOURCE, setHover, setSelected, type ParcelProps } from './parcelLayers';
 import { ParcelPanel } from './ParcelPanel';
 import { SearchBox } from './SearchBox';
@@ -15,6 +16,9 @@ import type { SearchHit } from './search';
 maplibregl.setWorkerUrl(workerUrl);
 const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
+const tiles = new PMTiles(PMTILES_URL ?? new ChunkedSource(PMTILES_CHUNKS_URL));
+protocol.add(tiles);
+const TILES_KEY = tiles.source.getKey();
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +65,7 @@ export default function App() {
     map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
 
     map.on('load', () => {
-      addParcelLayers(map);
+      addParcelLayers(map, TILES_KEY);
       setZoom(map.getZoom());
     });
     map.on('zoomend', () => setZoom(map.getZoom()));

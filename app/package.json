@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node -e \"require('fs').rmSync('dist/data/parcels.pmtiles',{force:true})\"",
+    "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "npm run build && wrangler dev",
-    "build:local": "tsc -b && vite build",
+    
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

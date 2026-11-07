@@ -1,5 +1,5 @@
 import type { LayerSpecification, Map as MlMap } from 'maplibre-gl';
-import { PMTILES_URL } from './config';
+
 
 export const PARCEL_SOURCE = 'parcels';
 export const FILL_LAYER = 'parcels-fill';
@@ -92,10 +92,11 @@ const layers: LayerSpecification[] = [
   },
 ];
 
-export function addParcelLayers(map: MlMap) {
+/** tilesKey: the PMTiles archive key registered with the pmtiles protocol. */
+export function addParcelLayers(map: MlMap, tilesKey: string) {
   map.addSource(PARCEL_SOURCE, {
     type: 'vector',
-    url: `pmtiles://${PMTILES_URL}`,
+    url: `pmtiles://${tilesKey}`,
   });
   for (const l of layers) map.addLayer(l);
 }

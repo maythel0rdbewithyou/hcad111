@@ -16,7 +16,7 @@ pre-built into a single [PMTiles](https://protomaps.com/docs/pmtiles) file.
 | Parcels | County shapefile + appraisal roll → GDAL/ogr2ogr → tippecanoe → `parcels.pmtiles` |
 | Labels | Self-hosted Noto Sans glyphs in `app/public/fonts` (SIL OFL, from protomaps/basemaps-assets) |
 | Search | A sharded JSON index built by the pipeline and searched in the browser (no geocoder) |
-| Hosting | Cloudflare Pages (app + search index) and Cloudflare R2 (`parcels.pmtiles`), both on free tiers |
+| Hosting | Cloudflare Pages free plan: app, search index and chunked parcel tiles |
 
 ## Data: Tarrant County, TX (MVP)
 
@@ -75,7 +75,8 @@ Open http://localhost:5173 and zoom in to Fort Worth or Arlington, or search for
 `117 E Belknap`.
 
 - `build_parcels.sh` downloads about 215 MB, takes about 3–5 minutes, and writes
-  `data/out/` before copying the results into `app/public/data/` (git-ignored).
+  `data/out/` before copying the results (tiles split into chunks) into
+  `app/public/data/` (git-ignored).
 - The map URL keeps the view in the hash (`#zoom/lat/lon`), so links can be shared.
 
 ## How the pipeline works
@@ -97,7 +98,8 @@ Open http://localhost:5173 and zoom in to Fort Worth or Arlington, or search for
      at z16.
    - `labels`: z15–16 owner-name points.
 
-   MapLibre overzooms z16 tiles for closer views. The Tarrant build is 217 MB, with
+   MapLibre overzooms z16 tiles for closer views. `split_pmtiles.py` then cuts the
+   archive into 8 MiB chunks for static hosting. The Tarrant build is 217 MB, with
    z16 tiles at 7 KB median and z14 tiles at 84 KB median (gzipped).
 5. **Search index.** `build_search_index.py` writes `search/manifest.json` plus about
    8,400 small shards (median 10 KB, max 330 KB), keyed by the first characters of
@@ -137,46 +139,48 @@ building edges.
 
 4. Add the source URLs and dates to the Data section of this README.
 
-## Deploy (Cloudflare Pages + R2, free tiers)
+## Deploy (Cloudflare Pages, free, no payment method)
 
-Both services need a free Cloudflare account. The free tiers, as of this writing,
-cover:
-- **R2:** 10 GB storage, 10M reads/month, free egress. One map tile is one read.
-- **Pages:** unlimited static requests, 20,000 files per deploy, 25 MiB per file.
+Everything goes on **Cloudflare Pages**: the app, the fonts, the search index and the
+parcel tiles. Pages caps each file at 25 MiB, so the pipeline splits
+`parcels.pmtiles` into 8 MiB chunks (`app/public/data/parcels/000.bin`…, plus
+`manifest.json`), and `app/src/chunkedSource.ts` reads them with HTTP Range
+requests as if they were one archive. A Tarrant deploy is about 8,450 files and
+530 MB. The Pages free plan allows 20,000 files per deploy.
 
-### 1. Upload the tiles to R2
+### GitHub Actions (recommended)
 
-1. In the Cloudflare dashboard, go to **R2**, create a bucket (e.g. `parcel-earth`)
-   and upload `data/out/parcels.pmtiles`. The dashboard limits uploads to 300 MB.
-   For larger files use the CLI:
+`.github/workflows/deploy.yml` rebuilds the data from TAD, builds the app and
+deploys it to Pages. It runs monthly and on demand (**Actions → Build data and
+deploy → Run workflow**). One-time setup is in the repo's **Settings → Secrets and
+variables → Actions**:
 
-   ```bash
-   npx wrangler r2 object put parcel-earth/parcels.pmtiles --file data/out/parcels.pmtiles --remote
-   ```
+- **Secret** `CLOUDFLARE_API_TOKEN` (or `KEY`): a Cloudflare API token with
+  *Account → Cloudflare Pages → Edit*.
+- **Variable** `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID.
+- **Variable** `PAGES_PROJECT` (optional, default `parcel-earth`).
 
-2. Under **Bucket → Settings → Public access**, enable the `r2.dev` subdomain, or
-   connect a custom domain you already have on Cloudflare. The `r2.dev` URL is
-   rate-limited and meant for light use; a custom domain also gets edge caching.
-3. Under **Bucket → Settings → CORS policy**, paste `deploy/r2-cors.json` with your
-   Pages URL filled in. PMTiles needs `Range` requests to be allowed.
-
-### 2. Build and deploy the app to Pages
+The Pages project must already exist. Create it in the dashboard, or with:
 
 ```bash
-cd app
-cp .env.example .env.production.local   # set VITE_PMTILES_URL to the R2 URL
-npm run build                           # drops parcels.pmtiles from dist/
-npx wrangler pages deploy dist --project-name parcel-earth
+npx wrangler pages project create parcel-earth --production-branch main
 ```
 
-`dist/` holds the app, the fonts and the search index (`dist/data/search`, about
-8.4k files). Re-running the deploy uploads only the files that changed. You can
-also connect the Git repo in the Pages dashboard, but the search index is
-git-ignored, so deploying with `wrangler` from a machine that has run the build is
-simpler.
+### From your own machine
 
-To update the data, re-run `scripts/build_parcels.sh`, re-upload `parcels.pmtiles`
-and re-deploy the app.
+```bash
+scripts/build_parcels.sh
+```
+
+```bash
+cd app && npm run build && npx wrangler pages deploy dist --project-name parcel-earth
+```
+
+### Optional: a single tiles file elsewhere
+
+If you'd rather host one `parcels.pmtiles` on a host that supports Range requests
+and CORS (e.g. R2 or S3), build with `VITE_PMTILES_URL=https://…/parcels.pmtiles`.
+For R2, `deploy/r2-cors.json` has the CORS policy.
 
 ## Project layout
 
@@ -185,6 +189,7 @@ app/                     Vite + React + TS front end
   src/App.tsx            map setup, hover/click, search fly-to
   src/parcelLayers.ts    PMTiles source + red line / fill / label layers
   src/ParcelPanel.tsx    side panel
+  src/chunkedSource.ts   reads the chunked pmtiles archive via Range requests
   src/SearchBox.tsx      search UI;  src/search.ts  shard loading + ranking
   public/fonts/          self-hosted SDF glyphs for labels
 scripts/
@@ -192,7 +197,8 @@ scripts/
   counties/tarrant.sh    Tarrant download/clean/join  (+ tarrant_prep_roll.py)
   build_search_index.py  sharded search index
   join_centers.py        attach parcel centers to accounts
+  split_pmtiles.py       split parcels.pmtiles into chunks for Pages
   fetch_fonts.sh         re-download the glyphs
-deploy/r2-cors.json      CORS policy for the R2 bucket
+deploy/r2-cors.json      CORS policy if you host a single pmtiles file on R2 instead
 data/                    raw downloads, work files and outputs (git-ignored)
 ```
