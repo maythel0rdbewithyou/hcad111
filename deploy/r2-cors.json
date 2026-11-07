@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://YOUR-PROJECT.pages.dev", "http://localhost:5173", "http://localhost:4173"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["range", "if-match"],
+    "ExposeHeaders": ["etag"],
+    "MaxAgeSeconds": 86400
+  }
+]
