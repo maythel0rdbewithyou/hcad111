@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.DS_Store
+.wrangler
+
+# Generated / downloaded data — never commit
+data/raw/
+data/work/
+data/out/
+*.pmtiles
+app/public/data/
