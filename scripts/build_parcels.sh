@@ -25,6 +25,20 @@ fetch() { # url dest
   log "downloading $1"
   curl -fL --retry 4 --retry-delay 2 -o "$2.part" "$1" && mv "$2.part" "$2"
 }
+# Coordinate operation for reprojecting county data to lon/lat.
+# USGS orthoimagery (NAIP etc.) is referenced to NAD83, and web maps draw it as
+# if it were WGS84. So parcels must go to NAD83 lon/lat with NO datum shift,
+# otherwise they can drift ~1-2 m from the imagery. PROJ picks the null
+# "NAD83 to WGS 84 (1)" operation when no datum grids are installed, but would
+# pick a grid shift if they are, so pin it explicitly. Usage: ogr2ogr ... $(ct_args EPSG:2276)
+ct_args() {
+  local pipe
+  if pipe=$(projinfo -s "$1" -t EPSG:4269 -o PROJ -q --single-line 2>/dev/null) && [[ -n "$pipe" ]]; then
+    printf '%s\n' -t_srs EPSG:4326 -ct "$pipe"
+  else
+    printf '%s\n' -t_srs EPSG:4326
+  fi
+}
 for tool in curl unzip python3 ogr2ogr tippecanoe; do
   command -v "$tool" >/dev/null || { echo "missing required tool: $tool" >&2; exit 1; }
 done

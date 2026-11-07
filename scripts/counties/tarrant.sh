@@ -27,11 +27,12 @@ county_build() {
   year=$(python3 -I "$SCRIPTS/counties/tarrant_prep_roll.py" "$roll" "$work/owners.csv" "$work/accounts_raw.csv")
 
   # Shapefile is NAD83 / Texas North Central (US ft, EPSG:2276) per its .prj.
-  # Reproject to EPSG:4326 so it lines up with web-mercator imagery.
+  # Reproject to lon/lat so it lines up with the imagery (see ct_args).
   log "reprojecting parcels ($layer) to EPSG:4326"
   rm -f "$work/work.gpkg"
+  local ct=(); mapfile -t ct < <(ct_args EPSG:2276)
   ogr2ogr -f GPKG "$work/work.gpkg" "$shp" \
-    -t_srs EPSG:4326 -nln parcels -nlt PROMOTE_TO_MULTI -makevalid \
+    -s_srs EPSG:2276 "${ct[@]}" -nln parcels -nlt PROMOTE_TO_MULTI -makevalid \
     -select TAXPIN,CALCULATED -lco SPATIAL_INDEX=NO
   ogr2ogr -update -f GPKG "$work/work.gpkg" "$work/owners.csv" -nln owners
   ogrinfo -q "$work/work.gpkg" -sql "CREATE INDEX owners_pin ON owners(pin)"

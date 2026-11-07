@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// Emit MapLibre's (self-contained) worker as an asset and point MapLibre at it;
+// its default lookup relative to its own module breaks once bundled.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { baseStyle } from './mapStyle';
 import { INITIAL_VIEW } from './config';
 import { addParcelLayers, FILL_LAYER, PARCEL_SOURCE, setHover, setSelected, type ParcelProps } from './parcelLayers';
@@ -9,6 +12,7 @@ import { ParcelPanel } from './ParcelPanel';
 import { SearchBox } from './SearchBox';
 import type { SearchHit } from './search';
 
+maplibregl.setWorkerUrl(workerUrl);
 const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
 
