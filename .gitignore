@@ -10,3 +10,4 @@ data/work/
 data/out/
 *.pmtiles
 app/public/data/
+data/*.log

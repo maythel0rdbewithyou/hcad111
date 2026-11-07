@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { baseStyle } from './mapStyle';
 import { INITIAL_VIEW } from './config';
+import { addParcelLayers } from './parcelLayers';
+
+const protocol = new Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile);
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,6 +25,7 @@ export default function App() {
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({}), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
+    map.on('load', () => addParcelLayers(map));
     (window as unknown as { map: maplibregl.Map }).map = map; // handy for debugging
     return () => map.remove();
   }, []);
