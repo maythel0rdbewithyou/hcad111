@@ -4,8 +4,10 @@ import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { baseStyle } from './mapStyle';
 import { INITIAL_VIEW } from './config';
-import { addParcelLayers, FILL_LAYER, setHover, setSelected, type ParcelProps } from './parcelLayers';
+import { addParcelLayers, FILL_LAYER, PARCEL_SOURCE, setHover, setSelected, type ParcelProps } from './parcelLayers';
 import { ParcelPanel } from './ParcelPanel';
+import { SearchBox } from './SearchBox';
+import type { SearchHit } from './search';
 
 const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -19,6 +21,24 @@ export default function App() {
   const select = useCallback((p: ParcelProps | null) => {
     setParcel(p);
     if (mapRef.current) setSelected(mapRef.current, p?.pin ?? null);
+  }, []);
+
+  /** Fly to a search result, then open its parcel once the tiles are in. */
+  const flyToHit = useCallback((hit: SearchHit) => {
+    const map = mapRef.current;
+    if (!map) return;
+    setParcel(null);
+    setSelected(map, hit.pin);
+    map.flyTo({ center: [hit.lon, hit.lat], zoom: Math.max(map.getZoom(), 18), speed: 1.6, essential: true });
+    map.once('idle', () => {
+      const f = map.querySourceFeatures(PARCEL_SOURCE, {
+        sourceLayer: 'parcels',
+        filter: ['==', ['get', 'pin'], hit.pin],
+      })[0];
+      // Several accounts can share a parcel; show the one that was searched.
+      const props = f ? (f.properties as ParcelProps) : { pin: hit.pin };
+      setParcel(props.acct === hit.acct ? props : { ...props, acct: hit.acct, owner: hit.owner, situs: hit.situs });
+    });
   }, []);
 
   useEffect(() => {
@@ -70,6 +90,7 @@ export default function App() {
   return (
     <>
       <div ref={containerRef} className="map" />
+      <SearchBox onPick={flyToHit} />
       {zoom < 14 && <div className="hint">Zoom in to see property lines</div>}
       {parcel && <ParcelPanel parcel={parcel} onClose={() => select(null)} />}
     </>

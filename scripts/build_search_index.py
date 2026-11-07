@@ -3,7 +3,7 @@
 
 A single JSON for a whole county would be hundreds of MB, so the index is split
 into small shards by the leading characters of each search key. The browser
-loads index.json once, then only the shard(s) matching what was typed.
+loads manifest.json once, then only the shard(s) matching what was typed.
 
 Search keys per account: owner name, situs address, street name (address
 without the house number), account number and parcel ID. Keys are uppercased,
@@ -84,7 +84,7 @@ for name, ids in final.items():
 
 meta = json.load(open(meta_json))
 meta.update({"accounts": len(records), "shards": sorted(final)})
-with open(os.path.join(out_dir, "index.json"), "w") as f:
+with open(os.path.join(out_dir, "manifest.json"), "w") as f:
     json.dump(meta, f, separators=(",", ":"))
 sizes.sort()
 print(

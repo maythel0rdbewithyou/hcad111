@@ -6,7 +6,7 @@
 #
 # Outputs:
 #   data/out/parcels.pmtiles     vector tiles: layers "parcels" (z14-16) + "labels" (z15-16)
-#   data/out/search/*.json       sharded search index (+ index.json manifest)
+#   data/out/search/*.json       sharded search index (+ manifest.json manifest)
 #   data/out/SOURCES.txt         where the data came from, and its dates
 # and copies them into app/public/data/ for local dev.
 #

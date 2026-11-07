@@ -21,7 +21,7 @@ let manifest: Promise<Manifest> | null = null;
 const shardCache = new Map<string, Promise<Row[]>>();
 
 export function loadManifest(): Promise<Manifest> {
-  manifest ??= fetch(`${SEARCH_BASE_URL}/index.json`).then((r) => {
+  manifest ??= fetch(`${SEARCH_BASE_URL}/manifest.json`).then((r) => {
     if (!r.ok) throw new Error(`search index missing (${r.status})`);
     return r.json();
   });
