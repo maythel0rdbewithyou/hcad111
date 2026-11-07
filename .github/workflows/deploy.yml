@@ -1,0 +1,70 @@
+# Rebuild the parcel data and deploy: parcels.pmtiles -> R2, app + search index -> Pages.
+#
+# One-time setup (repo Settings -> Secrets and variables -> Actions):
+#   secret   CLOUDFLARE_API_TOKEN   token with Account: Cloudflare Pages Edit, Workers R2 Storage Edit
+#   variable CLOUDFLARE_ACCOUNT_ID  your Cloudflare account ID
+#   variable PMTILES_URL           public URL of parcels.pmtiles in R2, e.g. https://pub-xxxx.r2.dev/parcels.pmtiles
+#   variable R2_BUCKET             (optional) bucket name, default parcel-earth
+#   variable PAGES_PROJECT         (optional) Pages project name, default parcel-earth
+name: Build data and deploy
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 3 * *' # monthly refresh from TAD
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.R2_BUCKET || 'parcel-earth' }}
+      PAGES_PROJECT: ${{ vars.PAGES_PROJECT || 'parcel-earth' }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GDAL and tippecanoe
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gdal-bin tippecanoe unzip
+          ogr2ogr --version && tippecanoe --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build parcel tiles and search index
+        run: scripts/build_parcels.sh
+
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Upload parcels.pmtiles to R2
+        working-directory: app
+        run: >
+          npx wrangler r2 object put "$R2_BUCKET/parcels.pmtiles"
+          --file ../data/out/parcels.pmtiles --remote
+          --content-type application/octet-stream
+
+      - name: Build app
+        working-directory: app
+        env:
+          VITE_PMTILES_URL: ${{ vars.PMTILES_URL }}
+        run: |
+          test -n "$VITE_PMTILES_URL" || { echo "Set the PMTILES_URL repository variable"; exit 1; }
+          npm run build
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: app
+        run: npx wrangler pages deploy dist --project-name "$PAGES_PROJECT" --branch main --commit-dirty=true
+
+      - name: Record data sources
+        run: cat data/out/SOURCES.txt >> "$GITHUB_STEP_SUMMARY"
