@@ -117,7 +117,7 @@ building edges.
 ## Add another county
 
 1. Find the county appraisal district's parcel GIS download and its roll/owner
-   export, plus the field that links them. For example, Harris County: <https://hcad.org/pdata/>.
+   export, plus the field that links them. For example, Harris County Appraisal District (<https://hcad.org>) publishes both.
 2. Create `scripts/counties/<name>.sh` (use `tarrant.sh` as a template) that defines
    `county_build`. It must write these files into `$WORK`:
    - `parcels.geojsons`: polygons in lon/lat with the standard properties above.
