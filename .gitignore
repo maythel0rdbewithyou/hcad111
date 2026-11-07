@@ -11,3 +11,4 @@ data/out/
 *.pmtiles
 app/public/data/
 data/*.log
+parcel-earth.bundle
